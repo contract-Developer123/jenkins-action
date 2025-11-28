@@ -14,8 +14,8 @@ const fail_on_misconfiguration = process.env.FAIL_ON_MISCONFIGURATION !== 'false
 const fail_on_vulnerability = process.env.FAIL_ON_VULNERABILITY !== 'false'; // default true
 const fail_on_secret = process.env.FAIL_ON_SECRET !== 'false'; // default true
 
-console.log('Starting SBOM scan of test-project source code');
 if (debug) {
+  console.log('Starting SBOM scan of test-project source code');
   console.log('\n🔧 Debug mode enabled');
   console.log(`Configuration:
   - debug: ${debug}
@@ -26,30 +26,40 @@ if (debug) {
 
 // Get project directory from environment variable (Jenkins uses WORKSPACE)
 const projectDir = process.env.WORKSPACE || process.cwd();
-console.log(`Project directory: ${projectDir}`);
+if (debug) {
+  console.log(`Project directory: ${projectDir}`);
+}
 
 // List files in current directory
-console.log('\nDirectory contents:');
-execSync('ls -la', { stdio: 'inherit' });
+if (debug) {
+  console.log('\nDirectory contents:');
+  execSync('ls -la', { stdio: 'inherit' });
+}
 
 // Create output directory
 const outputDir = path.join(projectDir, 'scan-report');
 if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
-  console.log(`\nCreated output directory: ${outputDir}`);
+  if (debug) {
+    console.log(`\nCreated output directory: ${outputDir}`);
+  }
 }
 
 // Run cdxgen to generate SBOM
 const cdxgenOutputFile = path.join(outputDir, 'cyclonedx.json');
-console.log(`\nGenerating SBOM with cdxgen...`);
-console.log(`Output file: ${cdxgenOutputFile}`);
+if (debug) {
+  console.log(`\nGenerating SBOM with cdxgen...`);
+  console.log(`Output file: ${cdxgenOutputFile}`);
+}
 
 try {
   execSync(`cdxgen -r ${projectDir} -o ${cdxgenOutputFile} --no-banner`, {
-    stdio: 'inherit',
+    stdio: debug ? 'inherit' : 'pipe',
     cwd: projectDir
   });
-  console.log('\nSBOM scan completed successfully!');
+  if (debug) {
+    console.log('\nSBOM scan completed successfully!');
+  }
 } catch (error) {
   console.error('Error during SBOM scan:', error.message);
   process.exit(1);
