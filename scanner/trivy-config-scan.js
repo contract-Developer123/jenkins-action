@@ -14,11 +14,10 @@ const fs = require('fs');
 function runTrivyScan(outputFile, projectDir = process.cwd(), options = {}) {
   const { debug = false, fail_on_misconfiguration = true } = options;
 
-  console.log(`\nRunning Trivy config scan...`);
-  console.log(`Scan target: ${projectDir}`);
-  console.log(`Trivy output file: ${outputFile}`);
-
   if (debug) {
+    console.log(`\nRunning Trivy config scan...`);
+    console.log(`Scan target: ${projectDir}`);
+    console.log(`Trivy output file: ${outputFile}`);
     console.log(`🔧 Debug: fail_on_misconfiguration = ${fail_on_misconfiguration}`);
   }
 
@@ -26,16 +25,16 @@ function runTrivyScan(outputFile, projectDir = process.cwd(), options = {}) {
 
   if (debug) {
     console.log(`🔧 Executing: ${command}`);
-  } else {
-    console.log(`Executing: Config scan...`);
   }
 
   try {
     execSync(command, {
-      stdio: 'inherit',
+      stdio: debug ? 'inherit' : 'pipe',
       cwd: projectDir
     });
-    console.log('\nTrivy config scan completed successfully!');
+    if (debug) {
+      console.log('\nTrivy config scan completed successfully!');
+    }
 
     // Check if misconfigurations were found by reading the report
     if (fs.existsSync(outputFile)) {
@@ -45,8 +44,8 @@ function runTrivyScan(outputFile, projectDir = process.cwd(), options = {}) {
       );
 
       if (hasIssues) {
-        console.warn('⚠️  Warning: Trivy found misconfigurations!');
         if (debug) {
+          console.warn('⚠️  Warning: Trivy found misconfigurations!');
           console.log(`🔧 Debug: Misconfigurations found, returning true. fail_on_misconfiguration is ${fail_on_misconfiguration}`);
         }
         return true; // Misconfigurations found

@@ -15,20 +15,23 @@ const path = require('path');
 function runGitleaksScan(scanDir, reportPath, rulesPath = null, options = {}) {
   const { debug = false, fail_on_secret = true } = options;
 
-  console.log(`\nRunning Gitleaks secret scan...`);
-  console.log(`Scan directory: ${scanDir}`);
-  console.log(`Report path: ${reportPath}`);
-
   if (debug) {
+    console.log(`\nRunning Gitleaks secret scan...`);
+    console.log(`Scan directory: ${scanDir}`);
+    console.log(`Report path: ${reportPath}`);
     console.log(`🔧 Debug: fail_on_secret = ${fail_on_secret}`);
   }
 
   // Use custom rules file if no rulesPath provided
   if (!rulesPath) {
     rulesPath = path.join(__dirname, 'gitleaks-custom-rules.toml');
-    console.log(`Using custom rules file: ${rulesPath}`);
+    if (debug) {
+      console.log(`Using custom rules file: ${rulesPath}`);
+    }
   } else {
-    console.log(`Config/Rules path: ${rulesPath}`);
+    if (debug) {
+      console.log(`Config/Rules path: ${rulesPath}`);
+    }
   }
 
   // Build the gitleaks command
@@ -36,22 +39,22 @@ function runGitleaksScan(scanDir, reportPath, rulesPath = null, options = {}) {
 
   if (debug) {
     console.log(`🔧 Executing: ${command}`);
-  } else {
-    console.log(`Executing: ${command}`);
   }
 
   try {
     execSync(command, {
-      stdio: 'inherit',
+      stdio: debug ? 'inherit' : 'pipe',
       cwd: scanDir
     });
-    console.log('\nGitleaks secret scan completed successfully!');
+    if (debug) {
+      console.log('\nGitleaks secret scan completed successfully!');
+    }
     return false; // No secrets found
   } catch (error) {
     // Gitleaks exits with code 1 if secrets are found
     if (error.status === 1) {
-      console.warn('\n⚠️  Warning: Gitleaks found potential secrets!');
       if (debug) {
+        console.warn('\n⚠️  Warning: Gitleaks found potential secrets!');
         console.log(`🔧 Debug: Secrets found, returning true. fail_on_secret is ${fail_on_secret}`);
       }
       return true; // Secrets found - let caller decide whether to fail

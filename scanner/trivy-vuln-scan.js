@@ -15,11 +15,10 @@ const fs = require('fs');
 function runTrivyVulnScan(scanSbomfile, outputFile, projectDir = process.cwd(), options = {}) {
   const { debug = false, fail_on_vulnerability = true } = options;
 
-  console.log(`\nRunning Trivy vulnerability scan...`);
-  console.log(`SBOM file: ${scanSbomfile}`);
-  console.log(`Trivy output file: ${outputFile}`);
-
   if (debug) {
+    console.log(`\nRunning Trivy vulnerability scan...`);
+    console.log(`SBOM file: ${scanSbomfile}`);
+    console.log(`Trivy output file: ${outputFile}`);
     console.log(`🔧 Debug: fail_on_vulnerability = ${fail_on_vulnerability}`);
   }
 
@@ -27,16 +26,16 @@ function runTrivyVulnScan(scanSbomfile, outputFile, projectDir = process.cwd(), 
 
   if (debug) {
     console.log(`🔧 Executing: ${command}`);
-  } else {
-    console.log(`Executing: Vulnerability scan...`);
   }
 
   try {
     execSync(command, {
-      stdio: 'inherit',
+      stdio: debug ? 'inherit' : 'pipe',
       cwd: projectDir
     });
-    console.log('\nTrivy vulnerability scan completed successfully!');
+    if (debug) {
+      console.log('\nTrivy vulnerability scan completed successfully!');
+    }
 
     // Check if vulnerabilities were found by reading the report
     if (fs.existsSync(outputFile)) {
@@ -46,8 +45,8 @@ function runTrivyVulnScan(scanSbomfile, outputFile, projectDir = process.cwd(), 
       );
 
       if (hasVulnerabilities) {
-        console.warn('⚠️  Warning: Trivy found vulnerabilities!');
         if (debug) {
+          console.warn('⚠️  Warning: Trivy found vulnerabilities!');
           console.log(`🔧 Debug: Vulnerabilities found, returning true. fail_on_vulnerability is ${fail_on_vulnerability}`);
         }
         return true; // Vulnerabilities found
