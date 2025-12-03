@@ -174,9 +174,10 @@ function transformSecretScanResponse(gitleaksReport) {
  * @param {object} combinedScanRequest - Combined scan request object
  * @param {string} sbomFilePath - Path to SBOM file
  * @param {string} boundary - Multipart boundary string
+ * @param {object} options - Additional options (repoName, branchName, etc.)
  * @returns {Buffer} - Multipart form data buffer
  */
-function createMultipartFormData(combinedScanRequest, sbomFilePath, boundary) {
+function createMultipartFormData(combinedScanRequest, sbomFilePath, boundary, options = {}) {
   const parts = [];
   const CRLF = '\r\n';
 
@@ -242,23 +243,23 @@ function createMultipartFormData(combinedScanRequest, sbomFilePath, boundary) {
   }
 
   // Add repoName field (optional) - repository name from Jenkins environment
-  const repoName = process.env.JOB_NAME || process.env.REPO_NAME;
-  if (repoName) {
+  // This is passed as a parameter from the calling function
+  if (options.repoName) {
     parts.push(
       `--${boundary}${CRLF}`,
       `Content-Disposition: form-data; name="repoName"${CRLF}${CRLF}`,
-      repoName,
+      options.repoName,
       CRLF
     );
   }
 
   // Add branchName field (optional) - branch name from Jenkins environment
-  const branchName = process.env.GIT_BRANCH || process.env.BRANCH_NAME;
-  if (branchName) {
+  // This is passed as a parameter from the calling function
+  if (options.branchName) {
     parts.push(
       `--${boundary}${CRLF}`,
       `Content-Disposition: form-data; name="branchName"${CRLF}${CRLF}`,
-      branchName,
+      options.branchName,
       CRLF
     );
   }
@@ -275,6 +276,92 @@ function createMultipartFormData(combinedScanRequest, sbomFilePath, boundary) {
   });
 
   return Buffer.concat(buffers);
+}
+
+/**
+ * Extract repository name and branch from Git URL
+ * @param {string} gitUrl - Git repository URL
+ * @returns {object} - Object containing repoName and provider
+ */
+function extractRepoInfoFromGitUrl(gitUrl) {
+  if (!gitUrl) return { repoName: null, provider: null };
+
+  try {
+    // Detect provider and extract repo name
+    if (gitUrl.includes('github.com')) {
+      // GitHub URL patterns:
+      // https://github.com/owner/repo.git
+      // git@github.com:owner/repo.git
+      const match = gitUrl.match(/github\.com[/:]([\w-]+\/[\w-]+?)(\.git)?$/);
+      return {
+        repoName: match ? match[1] : null,
+        provider: 'github'
+      };
+    } else if (gitUrl.includes('gitlab.com') || gitUrl.includes('gitlab')) {
+      // GitLab URL patterns:
+      // https://gitlab.com/owner/repo.git
+      // git@gitlab.com:owner/repo.git
+      const match = gitUrl.match(/gitlab[^/:]*[/:]([\w-]+\/[\w-]+?)(\.git)?$/);
+      return {
+        repoName: match ? match[1] : null,
+        provider: 'gitlab'
+      };
+    }
+
+    // Generic Git URL - try to extract repo name
+    const genericMatch = gitUrl.match(/[/:]([\w-]+\/[\w-]+?)(\.git)?$/);
+    return {
+      repoName: genericMatch ? genericMatch[1] : null,
+      provider: 'unknown'
+    };
+  } catch (error) {
+    debugLog(`Error parsing Git URL: ${error.message}`);
+    return { repoName: null, provider: null };
+  }
+}
+
+/**
+ * Clean branch name (remove origin/ prefix if present)
+ * @param {string} branchName - Raw branch name
+ * @returns {string} - Cleaned branch name
+ */
+function cleanBranchName(branchName) {
+  if (!branchName) return null;
+
+  // Remove "origin/" or "refs/heads/" prefix
+  return branchName
+    .replace(/^origin\//, '')
+    .replace(/^refs\/heads\//, '')
+    .trim();
+}
+
+/**
+ * Get repository and branch information from Jenkins environment
+ * Supports both GitHub and GitLab projects
+ * @returns {object} - Object containing repoName, branchName, and provider
+ */
+function getRepoAndBranchInfo() {
+  // Get Git URL from Jenkins environment
+  const gitUrl = process.env.GIT_URL || process.env.GIT_URL_1;
+
+  // Extract repo name and provider from Git URL
+  const { repoName: extractedRepoName, provider } = extractRepoInfoFromGitUrl(gitUrl);
+
+  // Get repo name (priority: extracted from Git URL > JOB_NAME > REPO_NAME)
+  const repoName = extractedRepoName || process.env.JOB_NAME || process.env.REPO_NAME;
+
+  // Get branch name from Jenkins environment and clean it
+  const rawBranchName = process.env.GIT_BRANCH || process.env.BRANCH_NAME;
+  const branchName = cleanBranchName(rawBranchName);
+
+  debugLog(`\n🔍 Repository Detection:`);
+  debugLog(`  Git URL: ${gitUrl || 'NOT SET'}`);
+  debugLog(`  Detected Provider: ${provider || 'unknown'}`);
+  debugLog(`  Repo Name: ${repoName || 'NOT SET'}`);
+  debugLog(`  Raw Branch: ${rawBranchName || 'NOT SET'}`);
+  debugLog(`  Cleaned Branch: ${branchName || 'NOT SET'}`);
+
+  return { repoName, branchName, provider };
 }
 
 /**
@@ -305,9 +392,11 @@ function sendToAPI(reports, apiUrl, options = {}) {
     const configScanResponseDto = transformConfigScanResponse(reports.trivyConfig);
     const scannerSecretResponse = transformSecretScanResponse(reports.gitleaks);
 
-    // Get repo and branch information from Jenkins environment
-    const repoName = process.env.JOB_NAME || process.env.REPO_NAME;
-    const branchName = process.env.GIT_BRANCH || process.env.BRANCH_NAME;
+    // Get repo and branch information from Jenkins environment (with GitHub/GitLab detection)
+    const { repoName, branchName, provider } = getRepoAndBranchInfo();
+
+    console.log(`\n📦 Repository Info: ${repoName || 'Unknown'} (${provider || 'unknown'})`);
+    console.log(`🌿 Branch: ${branchName || 'Unknown'}`);
 
     const combinedScanRequest = {
       configScanResponseDto,
@@ -363,7 +452,10 @@ function sendToAPI(reports, apiUrl, options = {}) {
     const boundary = `----WebKitFormBoundary${Math.random().toString(16).substring(2)}`;
     const outputDirPath = options.outputDir || './scan-report';
     const sbomFilePath = path.join(outputDirPath, 'cyclonedx.json');
-    const formData = createMultipartFormData(combinedScanRequest, sbomFilePath, boundary);
+    const formData = createMultipartFormData(combinedScanRequest, sbomFilePath, boundary, {
+      repoName,
+      branchName
+    });
 
     debugLog('\n📋 Multipart Form Data Details:');
     debugLog(`  - Boundary: ${boundary}`);
@@ -373,8 +465,8 @@ function sendToAPI(reports, apiUrl, options = {}) {
     debugLog(`  - source: jenkins`);
     debugLog(`  - organizationId: ${process.env.ORGANIZATION_ID || 'NOT SET'}`);
     debugLog(`  - jobId: ${process.env.BUILD_ID || process.env.BUILD_NUMBER || 'NOT SET'}`);
-    debugLog(`  - repoName: ${process.env.JOB_NAME || process.env.REPO_NAME || 'NOT SET'}`);
-    debugLog(`  - branchName: ${process.env.GIT_BRANCH || process.env.BRANCH_NAME || 'NOT SET'}`);
+    debugLog(`  - repoName: ${repoName || 'NOT SET'} (provider: ${provider || 'unknown'})`);
+    debugLog(`  - branchName: ${branchName || 'NOT SET'}`);
 
     // Prepare request options
     const requestOptions = {
