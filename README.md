@@ -18,7 +18,7 @@ Before using this integration, you need to:
 1. **Sign up for NeoTrack**: Create an account at [NeoTrack Platform](https://beta.neoTrak.io)
 2. **Obtain API Credentials**: Get your `NT_API_KEY` and `NT_SECRET_KEY` from the NeoTrack dashboard
 3. **Jenkins Server**: Jenkins server with Docker support
-4. **Docker Image**: `neotrak/neotrak-engine-base:1.0.0` (contains cdxgen, Trivy, Gitleaks, and the scanner pre-installed)
+4. **Docker Image**: `neotrak/neotrak-engine-base:1.0.1` (contains cdxgen, Trivy, Gitleaks, and the scanner pre-installed)
 
 ## Quick Start
 
@@ -98,7 +98,7 @@ pipeline {
         stage('neotrak_scan') {
             agent {
                 docker {
-                    image 'neotrak/neotrak-engine-base:1.0.0'
+                    image 'neotrak/neotrak-engine-base:1.0.1'
                 }
             }
             steps {
@@ -128,7 +128,7 @@ pipeline {
         stage('neotrak_scan') {
             agent {
                 docker {
-                    image 'neotrak/neotrak-engine-base:1.0.0'
+                    image 'neotrak/neotrak-engine-base:1.0.1'
                 }
             }
             steps {
@@ -173,7 +173,7 @@ pipeline {
                 stage('Security Scan') {
                     agent {
                         docker {
-                            image 'neotrak/neotrak-engine-base:1.0.0'
+                            image 'neotrak/neotrak-engine-base:1.0.1'
                         }
                     }
                     steps {
@@ -224,7 +224,7 @@ pipeline {
         stage('Security Scan') {
             agent {
                 docker {
-                    image 'neotrak/neotrak-engine-base:1.0.0'
+                    image 'neotrak/neotrak-engine-base:1.0.1'
                 }
             }
             steps {
@@ -279,7 +279,7 @@ pipeline {
             }
             agent {
                 docker {
-                    image 'neotrak/neotrak-engine-base:1.0.0'
+                    image 'neotrak/neotrak-engine-base:1.0.1'
                 }
             }
             steps {
@@ -394,7 +394,7 @@ pipeline {
         stage('Security Scan') {
             agent {
                 docker {
-                    image 'neotrak/neotrak-engine-base:1.0.0'
+                    image 'neotrak/neotrak-engine-base:1.0.1'
                 }
             }
             steps {
@@ -445,7 +445,7 @@ pipeline {
         stage('Security Scan') {
             agent {
                 docker {
-                    image 'neotrak/neotrak-engine-base:1.0.0'
+                    image 'neotrak/neotrak-engine-base:1.0.1'
                 }
             }
             steps {
@@ -516,7 +516,7 @@ All reports are automatically uploaded to the NeoTrack API and archived as Jenki
 | **Timeout Issues** | `ETIMEDOUT` or `ECONNABORTED` | • Scanner auto-retries up to 3 times<br>• Check Jenkins agent network connectivity<br>• Verify NeoTrack API is accessible from Jenkins<br>• Check firewall/proxy settings |
 | **SBOM Not Found** | `SBOM file not found — skipping upload` | • Ensure project has dependencies<br>• Verify package files exist (package.json, requirements.txt, go.mod, etc.)<br>• Check workspace is correctly mounted |
 | **Missing Credentials** | Credentials not found or undefined | • Verify credential IDs match in Jenkinsfile<br>• Check credentials exist in Jenkins credential store<br>• Ensure credentials are accessible to the job |
-| **Docker Image Pull Failures** | Docker image pull failures | • Confirm Jenkins agent has Docker installed<br>• Check agent can access Docker Hub<br>• Verify sufficient resources (CPU, memory, disk)<br>• Try manual pull: `docker pull neotrak/neotrak-engine-base:1.0.0` |
+| **Docker Image Pull Failures** | Docker image pull failures | • Confirm Jenkins agent has Docker installed<br>• Check agent can access Docker Hub<br>• Verify sufficient resources (CPU, memory, disk)<br>• Try manual pull: `docker pull neotrak/neotrak-engine-base:1.0.1` |
 | **Docker Permissions** | Permission denied accessing Docker | • Add Jenkins user to docker group: `sudo usermod -aG docker jenkins`<br>• Restart Jenkins: `sudo systemctl restart jenkins`<br>• Verify with: `sudo -u jenkins docker ps` |
 
 ### Verify Docker Image
@@ -524,8 +524,8 @@ All reports are automatically uploaded to the NeoTrack API and archived as Jenki
 Ensure the Docker image is accessible:
 
 ```bash
-docker pull neotrak/neotrak-engine-base:1.0.0
-docker run --rm neotrak/neotrak-engine-base:1.0.0 sh -c "cdxgen --version && trivy --version && gitleaks version"
+docker pull neotrak/neotrak-engine-base:1.0.1
+docker run --rm neotrak/neotrak-engine-base:1.0.1 sh -c "cdxgen --version && trivy --version && gitleaks version"
 ```
 
 ## Security Best Practices
